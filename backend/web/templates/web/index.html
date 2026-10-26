@@ -1,0 +1,151 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toolbox</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M9 12h14v11H9z' fill='none' stroke='white' stroke-width='2.5'/%3E%3Cpath d='M13 12V9h6v3' fill='none' stroke='white' stroke-width='2.5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{% static 'web/app.css' %}">
+  <script src="{% static 'web/app.js' %}" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Toolbox</h1>
+    <nav class="tabs" role="tablist">
+      <button role="tab" class="tab" data-tab="speech" aria-selected="true">Speech to text</button>
+      <button role="tab" class="tab" data-tab="vision" aria-selected="false">Image tools</button>
+    </nav>
+    <div class="status" id="status" aria-live="polite">
+      <span class="chip" data-service="stt"><i></i>Speech</span>
+      <span class="chip" data-service="vision"><i></i>Vision</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ───────────── Speech to text ───────────── -->
+    <section class="panel" id="tab-speech">
+      <div class="card controls">
+        <div class="field grow">
+          <label for="mic">Microphone</label>
+          <div class="row">
+            <select id="mic" disabled><option>Loading devices…</option></select>
+            <button class="btn ghost icon" id="mic-refresh" title="Refresh device list" aria-label="Refresh device list">↻</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="language">Language</label>
+          <select id="language"><option value="">Default</option></select>
+        </div>
+        <button class="btn ghost" id="mic-allow" hidden>Allow microphone access</button>
+      </div>
+
+      <div class="card recorder">
+        <button class="record" id="record" aria-pressed="false" disabled>
+          <span class="dot"></span><span class="label">Record</span>
+        </button>
+        <div class="meter" aria-hidden="true"><div id="level"></div></div>
+        <span class="timer" id="timer">0:00</span>
+        <label class="btn ghost upload">
+          Upload audio
+          <input type="file" id="audio-file" accept="audio/*,video/*" hidden>
+        </label>
+      </div>
+      <p class="hint" id="speech-msg" role="status"></p>
+      <audio id="playback" controls hidden></audio>
+
+      <div class="card">
+        <div class="row between">
+          <label for="transcript">Transcript</label>
+          <div class="row">
+            <button class="btn ghost small" id="copy">Copy</button>
+            <button class="btn ghost small" id="clear">Clear</button>
+          </div>
+        </div>
+        <textarea id="transcript" rows="12" placeholder="Record or upload audio. Each result is inserted at the cursor."></textarea>
+      </div>
+    </section>
+
+    <!-- ───────────── Image tools ───────────── -->
+    <section class="panel" id="tab-vision" hidden>
+      <div class="vision-grid">
+        <div class="card">
+          <label class="drop" id="drop">
+            <input type="file" id="image-file" accept="image/*" hidden>
+            <div class="drop-empty" id="drop-empty">
+              <strong>Drop an image</strong><span>or click to choose</span>
+            </div>
+            <div class="preview" id="preview" hidden>
+              <img id="preview-img" alt="Selected image">
+              <svg id="overlay" preserveAspectRatio="none"></svg>
+            </div>
+          </label>
+
+          <div class="segmented" role="radiogroup" aria-label="Mode">
+            <button role="radio" data-mode="matte" aria-checked="true">Alpha / background</button>
+            <button role="radio" data-mode="edit" aria-checked="false">Edit</button>
+            <button role="radio" data-mode="analyze" aria-checked="false">Analyze</button>
+          </div>
+
+          <form id="vision-form" class="stack">
+            <div class="field" data-for="matte edit">
+              <label for="query">Subject</label>
+              <input id="query" name="query" placeholder="the main subject" value="">
+              <small>What to keep as foreground, e.g. "person", "dog", "the red car".</small>
+            </div>
+
+            <div class="field" data-for="edit">
+              <label for="operation">Operation</label>
+              <select id="operation" name="operation">
+                <option value="remove_background">Remove background</option>
+                <option value="replace_background">Replace background</option>
+                <option value="blur_background">Blur background</option>
+                <option value="grayscale_background">Grayscale background</option>
+              </select>
+            </div>
+            <div class="field row" data-for="edit" data-op="replace_background">
+              <label for="color">Color</label>
+              <input type="color" id="color" name="color" value="#ffffff">
+              <label class="btn ghost small upload">
+                <span id="bg-label">Or background image…</span>
+                <input type="file" id="background" accept="image/*" hidden>
+              </label>
+            </div>
+            <div class="field" data-for="edit" data-op="blur_background">
+              <label for="blur">Blur radius <output id="blur-out">12</output></label>
+              <input type="range" id="blur" name="blur_radius" min="1" max="60" value="12">
+            </div>
+
+            <div class="field" data-for="analyze">
+              <label for="task">Task</label>
+              <select id="task" name="task">
+                <option value="detection">Detection</option>
+                <option value="referring">Referring expression</option>
+                <option value="segmentation">Segmentation</option>
+                <option value="matting">Matting</option>
+                <option value="point">Pointing</option>
+                <option value="count_box">Counting</option>
+                <option value="ocr">OCR</option>
+                <option value="ocr_grounding">Find text</option>
+              </select>
+            </div>
+            <div class="field" data-for="analyze">
+              <label for="aquery">Query</label>
+              <input id="aquery" placeholder="dog, cat">
+              <small>Detection: comma-separated labels. OCR: leave empty.</small>
+            </div>
+
+            <button class="btn primary" id="run" type="submit" disabled>Run</button>
+            <p class="hint" id="vision-msg" role="status"></p>
+          </form>
+        </div>
+
+        <div class="card results">
+          <div class="row between"><h2>Results</h2><span class="hint" id="latency"></span></div>
+          <div class="outputs" id="outputs"><p class="empty">Results appear here.</p></div>
+          <details id="raw" hidden><summary>Model output</summary><pre id="raw-text"></pre></details>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

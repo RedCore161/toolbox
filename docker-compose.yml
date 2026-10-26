@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-toolbox}
+      POSTGRES_USER: ${POSTGRES_USER:-toolbox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-toolbox}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      STT_URL: http://stt:8000
+      VISION_URL: http://vision:8000
+    volumes:
+      - media:/app/media
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      stt:
+        condition: service_started
+      vision:
+        condition: service_started
+
+  # Offline speech-to-text (Vosk / Kaldi), CPU only.
+  stt:
+    build:
+      context: ./services/stt
+      args:
+        VOSK_MODELS: ${VOSK_MODELS:-de=vosk-model-small-de-0.15,en=vosk-model-small-en-us-0.15}
+    environment:
+      DEFAULT_LANGUAGE: ${STT_DEFAULT_LANGUAGE:-de}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WeVisOne-VL: detection, segmentation and alpha matting.
+  # Runs on CPU by default; add docker-compose.gpu.yml for NVIDIA GPUs.
+  vision:
+    build: ./services/vision
+    environment:
+      WEVIS_MODEL: ${WEVIS_MODEL:-tencent/WeVisOne-VL-2B}
+      WEVIS_DEVICE: ${WEVIS_DEVICE:-auto}
+      WEVIS_DTYPE: ${WEVIS_DTYPE:-float16}
+      WEVIS_MAX_PIXELS: ${WEVIS_MAX_PIXELS:-393216}
+      WEVIS_DECODER_BATCH_SIZE: ${WEVIS_DECODER_BATCH_SIZE:-1}
+      # Optional: the model is public; a token only raises Hugging Face rate limits.
+      HF_TOKEN: ${HF_TOKEN:-}
+      # The Xet download backend stalls inside Docker on some setups; plain HTTPS is reliable.
+      HF_HUB_DISABLE_XET: "1"
+      HF_HUB_DOWNLOAD_TIMEOUT: "60"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15m
+
+volumes:
+  pgdata:
+  media:
+  hf-cache:
